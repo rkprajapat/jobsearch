@@ -44,19 +44,26 @@ def save_opportunities(opportunities: "Opportunity | list[Opportunity]") -> bool
     opportunities = [
         opp.model_copy(update={"source_hash": hashlib.sha256(opp.source_url.encode()).hexdigest()})
         for opp in opportunities
+        if opp.source_url
     ]
 
-    existing = load_opportunities()
-    existing_hashes = {opp.source_hash for opp in existing}
+    existing_by_hash = {
+        opp.source_hash: opp
+        for opp in load_opportunities()
+        if opp.source_hash
+    }
     for opp in opportunities:
-        if opp.source_hash not in existing_hashes:
-            existing.append(opp)
-            existing_hashes.add(opp.source_hash)
+        existing_by_hash[opp.source_hash] = opp
 
     try:
         _DATA_DIR.mkdir(parents=True, exist_ok=True)
         with open(_OPPORTUNITIES_FILE, "w") as f:
-            json.dump({opp.source_hash: opp.model_dump() for opp in existing}, f, indent=4, default=str)
+            json.dump(
+                {opp.source_hash: opp.model_dump() for opp in existing_by_hash.values()},
+                f,
+                indent=4,
+                default=str,
+            )
         return True
     except Exception as e:
         print(f"Error saving opportunities: {e}")
