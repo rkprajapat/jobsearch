@@ -263,6 +263,10 @@ class Observer:
             for source in SOURCES:
                 print(f"\n--- Observing source: {source} ---")
                 results = await self._observe_source(context, source, all_doms)
+
+                if not results:
+                    raise RuntimeError(f"No opportunities collected from {source} - check if the page structure has changed and update the DOM config accordingly.")
+
                 all_opportunities.extend(results)
                 print(f"--- Collected {len(results)} from {source} ---")
 

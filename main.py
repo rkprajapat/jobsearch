@@ -104,16 +104,18 @@ def _run_post_extraction_tasks(force: bool = False) -> None:
     _run_cluster_report(clusters_file=clusters_file)
 
 
-async def run_pipeline(force_post_extraction_tasks: bool = False) -> None:
-    observer = Observer()
-    await observer.observe()
+async def run_pipeline(only_jd: bool = False, cluster: bool = False) -> None:
+    if not only_jd:
+        observer = Observer()
+        await observer.observe()
     await run_jd_extractor()
-    _run_post_extraction_tasks(force=force_post_extraction_tasks)
+    _run_post_extraction_tasks(force=cluster)
 
 
 def main():
     should_cluster = "--cluster" in sys.argv
-    asyncio.run(run_pipeline(force_post_extraction_tasks=should_cluster))
+    job_description_arg = "--jd-only" in sys.argv
+    asyncio.run(run_pipeline(only_jd=job_description_arg, cluster=should_cluster))
 
 
 if __name__ == "__main__":

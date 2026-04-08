@@ -37,6 +37,28 @@ def load_opportunities() -> list[Opportunity]:
         return []
 
 
+def _is_missing_value(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    return False
+
+
+def _merge_opportunity(existing: Opportunity, incoming: Opportunity) -> Opportunity:
+    existing_data = existing.model_dump()
+    incoming_data = incoming.model_dump()
+
+    merged_data: dict[str, object] = {}
+    for field_name, existing_value in existing_data.items():
+        incoming_value = incoming_data.get(field_name)
+        merged_data[field_name] = (
+            incoming_value if _is_missing_value(existing_value) and not _is_missing_value(incoming_value) else existing_value
+        )
+
+    return Opportunity(**merged_data)
+
+
 def save_opportunities(opportunities: "Opportunity | list[Opportunity]") -> bool:
     if isinstance(opportunities, Opportunity):
         opportunities = [opportunities]
@@ -53,7 +75,8 @@ def save_opportunities(opportunities: "Opportunity | list[Opportunity]") -> bool
         if opp.source_hash
     }
     for opp in opportunities:
-        existing_by_hash[opp.source_hash] = opp
+        existing = existing_by_hash.get(opp.source_hash)
+        existing_by_hash[opp.source_hash] = _merge_opportunity(existing, opp) if existing else opp
 
     try:
         _DATA_DIR.mkdir(parents=True, exist_ok=True)
