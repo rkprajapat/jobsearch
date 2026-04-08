@@ -28,6 +28,12 @@ class _PreparedOpportunity:
     keyword_lemmas: list[str]
 
 
+@dataclass(slots=True)
+class _SentenceKeywordMatch:
+    sentence: str
+    keyword_count: int
+
+
 _ClusterIndices = dict[int, list[int]]
 
 
@@ -241,14 +247,166 @@ class JDClusteringService:
         blocked_terms = self._dynamic_stopwords | self._explicit_stopwords
         return [term for term, _, _, _ in scored_terms if term not in blocked_terms]
 
-    def _extract_summary(self, keywords: list[str]) -> str:
-        if not keywords:
-            return "No keywords available."
 
-        summary_keyword_count = min(15, len(keywords))
-        if summary_keyword_count < 10:
-            summary_keyword_count = len(keywords)
-        return ", ".join(keywords[:summary_keyword_count])
+    def _split_sentences(self, text: str) -> list[str]:
+        if not text:
+            return []
+
+        # Try spaCy sentence segmentation first.
+        base_sentences: list[str] = []
+        try:
+            doc = self._nlp(text)
+            base_sentences = [sent.text.strip() for sent in doc.sents if sent.text and sent.text.strip()]
+        except Exception:
+            base_sentences = []
+
+        if not base_sentences:
+            base_sentences = re.split(r"(?<=[.!?])\s+|\n+", text)
+
+        refined_sentences: list[str] = []
+
+        def split_overlong(sentence_text: str) -> list[str]:
+            compact = " ".join(sentence_text.split())
+            if not compact:
+                return []
+
+            if len(compact) <= 220 and len(compact.split()) <= 36:
+                return [compact]
+
+            primary_parts = [
+                " ".join(part.split())
+                for part in re.split(r"(?<=[,;:])\s+", compact)
+                if part and part.strip()
+            ]
+
+            # If punctuation split is still too coarse, chunk by word count.
+            output: list[str] = []
+            for part in primary_parts or [compact]:
+                words = part.split()
+                if len(words) <= 36:
+                    output.append(part)
+                    continue
+
+                chunk_size = 28
+                for idx in range(0, len(words), chunk_size):
+                    chunk = " ".join(words[idx : idx + chunk_size]).strip()
+                    if chunk:
+                        output.append(chunk)
+
+            return output
+
+        for sentence in base_sentences:
+            if not sentence or not sentence.strip():
+                continue
+
+            normalized = " ".join(sentence.split())
+            # Some scraped JDs are giant run-on blocks. Break those using heading/list transitions.
+            if len(normalized) > 280 or len(normalized.split()) > 45:
+                chunks = re.split(
+                    r"(?:\n+|[•●▪◦]+\s*|\s+[\-–—]\s+|\s*;\s+|(?<=[a-z0-9\)])\s+(?=[A-Z][A-Za-z]{2,}\s+[A-Z][A-Za-z]{2,}))",
+                    normalized,
+                )
+                for chunk in chunks:
+                    chunk_normalized = " ".join(chunk.split())
+                    if chunk_normalized:
+                        refined_sentences.extend(split_overlong(chunk_normalized))
+            else:
+                refined_sentences.extend(split_overlong(normalized))
+
+        return refined_sentences
+
+    def _build_keyword_terms(self, keywords: list[str]) -> tuple[set[str], set[tuple[str, ...]]]:
+        unigram_terms: set[str] = set()
+        phrase_terms: set[tuple[str, ...]] = set()
+        for keyword in keywords:
+            cleaned = " ".join(str(keyword).strip().lower().split())
+            if not cleaned:
+                continue
+            tokens = tuple(cleaned.split())
+            if len(tokens) == 1:
+                unigram_terms.add(tokens[0])
+            else:
+                phrase_terms.add(tokens)
+
+        return unigram_terms, phrase_terms
+
+    def _keyword_matches_for_sentence(
+        self,
+        sentence: str,
+        unigram_terms: set[str],
+        phrase_terms: set[tuple[str, ...]],
+    ) -> int:
+        doc = self._nlp(sentence)
+        tokens: list[str] = []
+        for token in doc:
+            normalized = self._normalize_lemma(token)
+            if normalized:
+                tokens.append(normalized)
+
+        if not tokens:
+            return 0
+
+        matched: set[str] = set()
+
+        for token in tokens:
+            if token in unigram_terms:
+                matched.add(token)
+
+        if phrase_terms:
+            token_count = len(tokens)
+            for phrase in phrase_terms:
+                phrase_len = len(phrase)
+                for idx in range(0, token_count - phrase_len + 1):
+                    if tuple(tokens[idx : idx + phrase_len]) == phrase:
+                        matched.add(" ".join(phrase))
+                        break
+
+        return len(matched)
+
+    def _extract_keyword_sentences(
+        self,
+        cluster_items: list[_PreparedOpportunity],
+        keywords: list[str],
+        limit: int = 20,
+    ) -> list[str]:
+        if not cluster_items or not keywords:
+            return []
+
+        unigram_terms, phrase_terms = self._build_keyword_terms(keywords)
+        if not unigram_terms and not phrase_terms:
+            return []
+
+        sentence_best_matches: dict[str, _SentenceKeywordMatch] = {}
+        for item in cluster_items:
+            jd_text = (item.opportunity.job_description or "").strip()
+            if not jd_text:
+                continue
+
+            for sentence in self._split_sentences(jd_text):
+                keyword_count = self._keyword_matches_for_sentence(
+                    sentence,
+                    unigram_terms,
+                    phrase_terms,
+                )
+                if keyword_count <= 0:
+                    continue
+
+                normalized_sentence = " ".join(sentence.split())
+                match = _SentenceKeywordMatch(
+                    sentence=normalized_sentence,
+                    keyword_count=keyword_count,
+                )
+                existing = sentence_best_matches.get(normalized_sentence)
+                if not existing or match.keyword_count > existing.keyword_count:
+                    sentence_best_matches[normalized_sentence] = match
+
+        ranked_matches = sorted(
+            sentence_best_matches.values(),
+            key=lambda value: (value.keyword_count, len(value.sentence)),
+            reverse=True,
+        )
+
+        return [match.sentence for match in ranked_matches[:limit]]
 
     def _resolve_min_cluster_size(self, sample_count: int) -> int:
         if sample_count <= 1:
@@ -433,6 +591,7 @@ class JDClusteringService:
         return {
             "id": str(opportunity.id),
             "designation": opportunity.designation,
+            "company_name": opportunity.company_name,
         }
 
     def _build_cluster_record(self, cluster_id: int, cluster_items: list[_PreparedOpportunity]) -> dict:
@@ -441,8 +600,8 @@ class JDClusteringService:
         return {
             "cluster_id": cluster_id,
             "total_opportunities": len(opportunities),
-            "summary_keywords": self._extract_summary(keywords),
             "keywords": keywords,
+            "keyword_sentences": self._extract_keyword_sentences(cluster_items, keywords),
             "opportunities": [
                 self._serialize_opportunity(opportunity)
                 for opportunity in opportunities

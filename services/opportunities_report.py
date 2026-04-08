@@ -50,6 +50,15 @@ class ClusterPDFReportService:
             textColor=colors.HexColor("#111827"),
             spaceAfter=4,
         )
+        self._sentence_style = ParagraphStyle(
+            "ClusterSentence",
+            parent=self._styles["BodyText"],
+            fontSize=9,
+            leading=13,
+            textColor=colors.HexColor("#1f2937"),
+            leftIndent=8,
+            spaceAfter=2,
+        )
 
     def _read_clusters_payload(self, clusters_file: Path) -> dict:
         if not clusters_file.exists():
@@ -103,14 +112,14 @@ class ClusterPDFReportService:
         return table
 
     def _build_opportunities_table(self, opportunities: list[dict], limit: int = 12) -> Table:
-        rows: list[list[str]] = [["Designation", "Opportunity ID"]]
+        rows: list[list[str]] = [["Designation", "Company Name"]]
         if not opportunities:
             rows.append(["No opportunities attached.", "n/a"])
         else:
             for opportunity in opportunities[:limit]:
                 designation = str(opportunity.get("designation", "Unknown role"))
-                opportunity_id = str(opportunity.get("id", "n/a"))
-                rows.append([designation, opportunity_id])
+                company_name = str(opportunity.get("company_name") or "Unknown company")
+                rows.append([designation, company_name])
 
         table = Table(rows, colWidths=[132 * mm, 36 * mm])
         table.setStyle(
@@ -136,8 +145,8 @@ class ClusterPDFReportService:
     def _build_cluster_block(self, cluster: dict) -> KeepTogether:
         cluster_id = str(cluster.get("cluster_id", "n/a"))
         total = str(cluster.get("total_opportunities", 0))
-        summary = str(cluster.get("summary_keywords", "No summary available."))
         keywords = cluster.get("keywords", [])
+        keyword_sentences = cluster.get("keyword_sentences", [])
         opportunities = cluster.get("opportunities", [])
 
         keywords_line = ", ".join(str(keyword) for keyword in keywords[:24])
@@ -146,12 +155,24 @@ class ClusterPDFReportService:
 
         block = [
             Paragraph(f"Cluster {cluster_id} ({total} opportunities)", self._card_heading_style),
-            Paragraph(f"<b>Summary:</b> {summary}", self._body_style),
             Paragraph(f"<b>Top Keywords:</b> {keywords_line}", self._body_style),
             Spacer(1, 2 * mm),
+            Paragraph("<b>Top Matching Sentences:</b>", self._body_style),
+        ]
+
+        if keyword_sentences:
+            for idx, sentence in enumerate(keyword_sentences[:20], start=1):
+                block.append(Paragraph(f"{idx}. {str(sentence)}", self._sentence_style))
+        else:
+            block.append(Paragraph("No keyword-matching sentences available.", self._sentence_style))
+
+        block.extend(
+            [
+                Spacer(1, 2 * mm),
             self._build_opportunities_table(opportunities),
             Spacer(1, 6 * mm),
-        ]
+            ]
+        )
         return KeepTogether(block)
 
     def generate_pdf_report(
