@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 import json
 import hashlib
+from configs import PROJECT_DATA_DIR
 
-_DATA_DIR = Path(__file__).parent.parent / "project_data"
-_OPPORTUNITIES_FILE = _DATA_DIR / "opportunities.json"
+_OPPORTUNITIES_FILE = PROJECT_DATA_DIR.joinpath("opportunities.json")
 
 
 class Opportunity(BaseModel):
@@ -79,7 +79,6 @@ def save_opportunities(opportunities: "Opportunity | list[Opportunity]") -> bool
         existing_by_hash[opp.source_hash] = _merge_opportunity(existing, opp) if existing else opp
 
     try:
-        _DATA_DIR.mkdir(parents=True, exist_ok=True)
         with open(_OPPORTUNITIES_FILE, "w") as f:
             json.dump(
                 {opp.source_hash: opp.model_dump() for opp in existing_by_hash.values()},

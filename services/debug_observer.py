@@ -14,15 +14,14 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-from configs import LINKEDIN_CREDENTIALS, LOGIN_WAIT_SECONDS
+from configs import LINKEDIN_CREDENTIALS, LOGIN_WAIT_SECONDS, PROJECT_DATA_DIR
 from services.human_actions import HumanActions
 from services.playwright_runtime import PlaywrightRuntime
 
-_PROJECT_DATA = Path(__file__).parent.parent / "project_data"
 _ACTIONS = HumanActions()
 _RUNTIME = PlaywrightRuntime()
 
-SCREENSHOTS = _PROJECT_DATA / "debug_screenshots"
+SCREENSHOTS = PROJECT_DATA_DIR.joinpath("debug_screenshots")
 SCREENSHOTS.mkdir(parents=True, exist_ok=True)
 
 

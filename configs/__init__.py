@@ -11,6 +11,8 @@ from .inputs import (
     SKILLS,
     SCOPE,
     SOURCES,
+    PROJECT_DATA_DIR,
+    DOMS_FILE_PATH
 )
 __all__ = [
     "SKILLS",

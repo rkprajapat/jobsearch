@@ -2,14 +2,23 @@ from playwright.async_api import Page
 
 from configs import LOGIN_WAIT_SECONDS
 from services.human_actions import HumanActions
+from configs import (
+    JOBS_PER_SOURCE,
+    LINKEDIN_CREDENTIALS,
+    MAX_PAGES,
+    PREFERRED_LOCATIONS,
+    SCOPE,
+    SKILLS,
+    SOURCES,
+)
 
 
 async def login_linkedin(page: Page, doms: dict, credentials: dict, actions: HumanActions) -> None:
     """Navigate to LinkedIn login and authenticate with the given credentials."""
-    email = credentials.get("email", "")
-    password = credentials.get("password", "")
+    email = LINKEDIN_CREDENTIALS.get("email", "")
+    password = LINKEDIN_CREDENTIALS.get("password", "")
     if not email or not password:
-        print("LinkedIn credentials not set in inputs.json - skipping login.")
+        print("LinkedIn credentials not set in environment variables - skipping login.")
         return
 
     print("Navigating to LinkedIn login...")

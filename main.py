@@ -7,15 +7,16 @@ from configs import (
     CLUSTERING_EXPLICIT_STOPWORDS,
     CLUSTERING_MIN_CLUSTER_SIZE,
     CLUSTERING_VERSIONED_OUTPUT,
+    PROJECT_DATA_DIR
+    
 )
 from services.observer import Observer
 from services.jd_clustering import JDClusteringService
 from services.jd_extractor import run_jd_extractor
 from services.opportunities_report import ClusterPDFReportService
 
-_PROJECT_DATA = Path(__file__).parent / "project_data"
-_CLUSTERS_FILE = _PROJECT_DATA / "clusters.json"
-_CLUSTER_REPORT_FILE = _PROJECT_DATA / "clusters_report.pdf"
+_CLUSTERS_FILE = PROJECT_DATA_DIR.joinpath("clusters.json")
+_CLUSTER_REPORT_FILE = PROJECT_DATA_DIR.joinpath("clusters_report.pdf")
 _FRESHNESS_WINDOW_DAYS = 30
 
 

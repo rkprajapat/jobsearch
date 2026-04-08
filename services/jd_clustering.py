@@ -16,9 +16,10 @@ from sklearn.metrics.pairwise import cosine_distances
 import spacy
 
 from models.opportunity import Opportunity, load_opportunities
+from configs import PROJECT_DATA_DIR
 
-_PROJECT_DATA = Path(__file__).parent.parent / "project_data"
-_CLUSTERS_FILE = _PROJECT_DATA / "clusters.json"
+
+_CLUSTERS_FILE = PROJECT_DATA_DIR.joinpath("clusters.json")
 
 
 @dataclass(slots=True)
@@ -681,14 +682,14 @@ class JDClusteringService:
         )
 
     def save_clusters(self, cluster_result: dict) -> dict[str, str]:
-        _PROJECT_DATA.mkdir(parents=True, exist_ok=True)
+        PROJECT_DATA_DIR.mkdir(parents=True, exist_ok=True)
         with open(_CLUSTERS_FILE, "w", encoding="utf-8") as file:
             json.dump(cluster_result, file, indent=4)
 
         saved_files: dict[str, str] = {"latest": str(_CLUSTERS_FILE)}
         if self.write_versioned_output:
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
-            versioned_path = _PROJECT_DATA / f"clusters_{timestamp}.json"
+            versioned_path = PROJECT_DATA_DIR.joinpath(f"clusters_{timestamp}.json")
             with open(versioned_path, "w", encoding="utf-8") as file:
                 json.dump(cluster_result, file, indent=4)
             saved_files["versioned"] = str(versioned_path)

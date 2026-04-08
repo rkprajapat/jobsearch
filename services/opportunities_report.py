@@ -10,14 +10,14 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-_PROJECT_DATA = Path(__file__).parent.parent / "project_data"
-_DEFAULT_CLUSTERS_FILE = _PROJECT_DATA / "clusters.json"
-_DEFAULT_REPORT_FILE = _PROJECT_DATA / "clusters_report.pdf"
+from configs import PROJECT_DATA_DIR
+
+_DEFAULT_CLUSTERS_FILE = PROJECT_DATA_DIR.joinpath("clusters.json")
+_DEFAULT_REPORT_FILE = PROJECT_DATA_DIR.joinpath("clusters_report.pdf")
 
 
 class ClusterPDFReportService:
-    def __init__(self, base_path: Path | None = None) -> None:
-        self._base_path = base_path or _PROJECT_DATA
+    def __init__(self) -> None:
         self._styles = getSampleStyleSheet()
         self._title_style = ParagraphStyle(
             "ClusterReportTitle",
