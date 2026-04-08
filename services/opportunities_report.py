@@ -111,12 +111,12 @@ class ClusterPDFReportService:
         )
         return table
 
-    def _build_opportunities_table(self, opportunities: list[dict], limit: int = 12) -> Table:
+    def _build_opportunities_table(self, opportunities: list[dict]) -> Table:
         rows: list[list[str]] = [["Designation", "Company Name"]]
         if not opportunities:
             rows.append(["No opportunities attached.", "n/a"])
         else:
-            for opportunity in opportunities[:limit]:
+            for opportunity in opportunities:
                 designation = str(opportunity.get("designation", "Unknown role"))
                 company_name = str(opportunity.get("company_name") or "Unknown company")
                 rows.append([designation, company_name])
