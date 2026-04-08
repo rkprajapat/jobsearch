@@ -111,17 +111,19 @@ class ClusterPDFReportService:
         )
         return table
 
-    def _build_opportunities_table(self, opportunities: list[dict]) -> Table:
-        rows: list[list[str]] = [["Designation", "Company Name"]]
+    def _build_opportunities_table(self, opportunities: list[dict], usable_width: float) -> Table:
+        rows: list[list[str]] = [["Designation", "Company Name", "URL"]]
         if not opportunities:
-            rows.append(["No opportunities attached.", "n/a"])
+            rows.append(["No opportunities attached.", "n/a", "n/a"])
         else:
             for opportunity in opportunities:
-                designation = str(opportunity.get("designation", "Unknown role"))
-                company_name = str(opportunity.get("company_name") or "Unknown company")
-                rows.append([designation, company_name])
+                designation = Paragraph(str(opportunity.get("designation", "Unknown role")), self._body_style)
+                company_name = Paragraph(str(opportunity.get("company_name") or "Unknown company"), self._body_style)
+                url = Paragraph(str(opportunity.get("url") or "n/a"), self._body_style)
+                rows.append([designation, company_name, url])
 
-        table = Table(rows, colWidths=[132 * mm, 36 * mm])
+        col_widths = [usable_width * 0.33, usable_width * 0.33, usable_width * 0.33]
+        table = Table(rows, colWidths=col_widths)
         table.setStyle(
             TableStyle(
                 [
@@ -142,7 +144,7 @@ class ClusterPDFReportService:
         )
         return table
 
-    def _build_cluster_block(self, cluster: dict) -> KeepTogether:
+    def _build_cluster_block(self, cluster: dict, usable_width: float) -> KeepTogether:
         cluster_id = str(cluster.get("cluster_id", "n/a"))
         total = str(cluster.get("total_opportunities", 0))
         keywords = cluster.get("keywords", [])
@@ -169,7 +171,7 @@ class ClusterPDFReportService:
         block.extend(
             [
                 Spacer(1, 2 * mm),
-            self._build_opportunities_table(opportunities),
+            self._build_opportunities_table(opportunities, usable_width),
             Spacer(1, 6 * mm),
             ]
         )
@@ -206,8 +208,9 @@ class ClusterPDFReportService:
             Spacer(1, 6 * mm),
         ]
 
+        usable_width = A4[0] - doc.leftMargin - doc.rightMargin
         for cluster in payload.get("clusters", []):
-            elements.append(self._build_cluster_block(cluster))
+            elements.append(self._build_cluster_block(cluster, usable_width))
 
         doc.build(elements)
         return report_path

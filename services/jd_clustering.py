@@ -593,6 +593,7 @@ class JDClusteringService:
             "id": str(opportunity.id),
             "designation": opportunity.designation,
             "company_name": opportunity.company_name,
+            "url": opportunity.source_url
         }
 
     def _build_cluster_record(self, cluster_id: int, cluster_items: list[_PreparedOpportunity]) -> dict:
