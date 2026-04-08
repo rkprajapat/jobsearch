@@ -40,7 +40,7 @@
     "jobs_per_source": 50,
     "max_pages": 5,
     "headless": false,
-    "login_wait_seconds": 15,
+    "login_wait_seconds": 30,
     "clustering": {
         "random_seed": 42,
         "write_versioned_output": true,

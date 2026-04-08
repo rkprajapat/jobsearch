@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.14.2"
 dependencies = [
     "en-core-web-sm",
-    "pandas==3.0.2",
     "playwright==1.58.0",
     "pydantic==2.12.5",
     "python-dotenv==1.2.2",
