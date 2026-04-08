@@ -1,0 +1,27 @@
+{
+    "linkedin.com": {
+        "requires_login": true,
+        "login_url": "https://www.linkedin.com/login",
+        "login_email_field": "#username",
+        "login_password_field": "#password",
+        "login_submit": "button[type='submit']",
+        "post_login_indicator": "div[data-testid='primary-nav']",
+
+        "search_keyword_input": "input[data-testid='typeahead-input']",
+
+        "job_results_container": "div[data-testid='lazy-column']",
+        "job_card_item": "div[role='button'][componentkey]",
+        "jd_expand_more_button": [
+            "button[aria-label*='more' i]",
+            "button.inline-show-more-text__button",
+            "button.show-more-less-html__button"
+        ],
+        "jd_description_container": [
+            "div.jobs-description-content__text",
+            "div.jobs-box__html-content",
+            "div.show-more-less-html__markup"
+        ],
+
+        "pagination_next_button": "button[data-testid='pagination-controls-next-button-visible']"
+    }
+}
