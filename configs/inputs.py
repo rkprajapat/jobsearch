@@ -28,8 +28,13 @@ HEADLESS: bool = __data__.get("headless", True)
 LOGIN_WAIT_SECONDS: int = __data__.get("login_wait_seconds", 15)
 LINKEDIN_CREDENTIALS: dict = __data__.get("credentials", {}).get("linkedin", {})
 CLUSTERING_CONFIG: dict = __data__.get("clustering", {})
-CLUSTERING_K: int = CLUSTERING_CONFIG.get("k", 5)
 CLUSTERING_VERSIONED_OUTPUT: bool = CLUSTERING_CONFIG.get("write_versioned_output", True)
+_CLUSTERING_MIN_CLUSTER_SIZE_RAW = CLUSTERING_CONFIG.get("min_cluster_size")
+CLUSTERING_MIN_CLUSTER_SIZE: int | None = (
+    int(_CLUSTERING_MIN_CLUSTER_SIZE_RAW)
+    if _CLUSTERING_MIN_CLUSTER_SIZE_RAW is not None
+    else None
+)
 CLUSTERING_EXPLICIT_STOPWORDS: Sequence[str] = __data__.get("stopwords", [])
 
 if __name__ == "__main__":

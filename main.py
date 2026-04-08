@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from configs import (
     CLUSTERING_EXPLICIT_STOPWORDS,
-    CLUSTERING_K,
+    CLUSTERING_MIN_CLUSTER_SIZE,
     CLUSTERING_VERSIONED_OUTPUT,
 )
 from services.observer import Observer
@@ -59,9 +59,9 @@ def _is_recently_updated_file(file_path: Path) -> bool:
 
 def _run_clustering() -> str | None:
     service = JDClusteringService(
-        k=CLUSTERING_K,
         write_versioned_output=CLUSTERING_VERSIONED_OUTPUT,
         explicit_stopwords=CLUSTERING_EXPLICIT_STOPWORDS,
+        min_cluster_size=CLUSTERING_MIN_CLUSTER_SIZE,
     )
     saved_files = service.run_and_save()
     print(f"Cluster output written to: {saved_files['latest']}")

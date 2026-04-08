@@ -82,8 +82,6 @@ class ClusterPDFReportService:
         clusters = payload.get("clusters", [])
         data = [
             ["Detected clusters", str(len(clusters))],
-            ["Configured max k", str(payload.get("max_k", "n/a"))],
-            ["Effective k", str(payload.get("effective_k", "n/a"))],
         ]
         table = Table(data, colWidths=[48 * mm, 120 * mm])
         table.setStyle(

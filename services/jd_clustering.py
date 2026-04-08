@@ -7,11 +7,12 @@ import math
 from pathlib import Path
 import json
 import re
-from typing import Sequence
+from typing import Any, Sequence
 
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import silhouette_score
+from sklearn.metrics.pairwise import cosine_distances
 import spacy
 
 from models.opportunity import Opportunity, load_opportunities
@@ -27,18 +28,21 @@ class _PreparedOpportunity:
     keyword_lemmas: list[str]
 
 
+_ClusterIndices = dict[int, list[int]]
+
+
 class JDClusteringService:
     def __init__(
         self,
-        k: int,
         write_versioned_output: bool = True,
         explicit_stopwords: Sequence[str] | None = None,
+        min_cluster_size: int | None = None,
     ) -> None:
-        if k <= 0:
-            raise ValueError("k must be greater than 0")
+        if min_cluster_size is not None and min_cluster_size <= 0:
+            raise ValueError("min_cluster_size must be greater than 0")
 
-        self.k = k
         self.write_versioned_output = write_versioned_output
+        self.min_cluster_size = min_cluster_size
         self._nlp = self._load_nlp()
         self._dynamic_stopwords: set[str] = set()
         self._explicit_stopwords = self._normalize_stopword_terms(explicit_stopwords or [])
@@ -246,84 +250,244 @@ class JDClusteringService:
             summary_keyword_count = len(keywords)
         return ", ".join(keywords[:summary_keyword_count])
 
-    def _find_best_cluster_count(self, tfidf_matrix, sample_count: int) -> int:
-        if sample_count <= 2:
+    def _resolve_min_cluster_size(self, sample_count: int) -> int:
+        if sample_count <= 1:
             return 1
 
-        max_candidate_k = min(self.k, sample_count - 1)
-        if max_candidate_k < 2:
-            return 1
+        if self.min_cluster_size is not None:
+            return min(sample_count, max(2, self.min_cluster_size))
 
-        dense_matrix = tfidf_matrix.toarray()
-        best_k = 2
-        best_score = float("-inf")
-        for candidate_k in range(2, max_candidate_k + 1):
-            labels = AgglomerativeClustering(
-                n_clusters=candidate_k,
-                metric="cosine",
-                linkage="average",
-            ).fit_predict(dense_matrix)
+        # Adaptive default: at least 3 members, about 5% of samples on larger datasets.
+        return min(sample_count, max(3, math.ceil(sample_count * 0.05)))
 
-            if len(set(labels)) < 2:
-                continue
+    def _build_threshold_candidates(self, merge_distances: list[float], max_candidates: int = 30) -> list[float]:
+        if not merge_distances:
+            return []
 
-            score = silhouette_score(tfidf_matrix, labels, metric="cosine")
-            if score > best_score:
-                best_score = score
-                best_k = candidate_k
+        if len(merge_distances) <= max_candidates:
+            return merge_distances
 
-        return best_k
+        step = max(1, len(merge_distances) // max_candidates)
+        return merge_distances[::step][:max_candidates]
 
-    def _fit_labels(self, tfidf_matrix, sample_count: int, effective_k: int):
-        if effective_k == 1:
-            return [0] * sample_count
+    def _fit_labels_for_threshold(self, dense_matrix, threshold: float):
         return AgglomerativeClustering(
-            n_clusters=effective_k,
+            n_clusters=None,
+            distance_threshold=threshold,
             metric="cosine",
             linkage="average",
-        ).fit_predict(tfidf_matrix.toarray())
+        ).fit_predict(dense_matrix)
 
-    def _group_cluster_indices(self, labels) -> dict[int, list[int]]:
-        clusters: dict[int, list[int]] = {}
+    def _score_natural_candidate(
+        self,
+        labels_array,
+        tfidf_matrix,
+        sample_count: int,
+        min_cluster_size: int,
+    ) -> tuple[float, int] | None:
+        discovered_k = len(set(labels_array))
+        if discovered_k < 2 or discovered_k >= sample_count:
+            return None
+
+        cluster_sizes = list(Counter(labels_array).values())
+        if all(size < min_cluster_size for size in cluster_sizes):
+            return None
+
+        silhouette = silhouette_score(tfidf_matrix, labels_array, metric="cosine")
+        largest_share = max(cluster_sizes) / sample_count
+        tiny_share = sum(size for size in cluster_sizes if size < min_cluster_size) / sample_count
+
+        # Penalize dominant and tiny-fragment-heavy solutions for tighter cluster focus.
+        score = silhouette - (0.35 * largest_share) - (0.20 * tiny_share)
+        return score, discovered_k
+
+    def _find_natural_labels(
+        self,
+        tfidf_matrix,
+        dense_matrix,
+        sample_count: int,
+        min_cluster_size: int,
+    ) -> tuple[list[int], int, float | None]:
+        if sample_count <= 2:
+            return [0] * sample_count, 1, None
+
+        base_model = AgglomerativeClustering(
+            n_clusters=None,
+            distance_threshold=0.0,
+            metric="cosine",
+            linkage="average",
+            compute_distances=True,
+        ).fit(dense_matrix)
+
+        merge_distances = sorted({float(distance) for distance in base_model.distances_ if distance > 0})
+        if not merge_distances:
+            return [0] * sample_count, 1, None
+
+        candidate_thresholds = self._build_threshold_candidates(merge_distances)
+
+        best_labels: list[int] = [0] * sample_count
+        best_k = 1
+        best_threshold: float | None = None
+        best_score = float("-inf")
+
+        for threshold in candidate_thresholds:
+            labels_array = self._fit_labels_for_threshold(dense_matrix, threshold)
+
+            score_and_k = self._score_natural_candidate(
+                labels_array=labels_array,
+                tfidf_matrix=tfidf_matrix,
+                sample_count=sample_count,
+                min_cluster_size=min_cluster_size,
+            )
+            if score_and_k is None:
+                continue
+
+            score, discovered_k = score_and_k
+            if score > best_score:
+                best_score = score
+                best_labels = [int(label) for label in labels_array]
+                best_k = discovered_k
+                best_threshold = threshold
+
+        return best_labels, best_k, best_threshold
+
+    def _split_clusters_by_size(
+        self,
+        clusters: _ClusterIndices,
+        min_cluster_size: int,
+    ) -> tuple[list[int], list[int]]:
+        major_cluster_ids: list[int] = []
+        tiny_cluster_ids: list[int] = []
+        for cluster_id, members in clusters.items():
+            if len(members) >= min_cluster_size:
+                major_cluster_ids.append(cluster_id)
+            else:
+                tiny_cluster_ids.append(cluster_id)
+
+        return major_cluster_ids, tiny_cluster_ids
+
+    def _build_cluster_centroids(
+        self,
+        clusters: _ClusterIndices,
+        dense_matrix,
+        allowed_cluster_ids: set[int],
+    ) -> dict[int, Any]:
+        return {
+            cluster_id: dense_matrix[members].mean(axis=0)
+            for cluster_id, members in clusters.items()
+            if cluster_id in allowed_cluster_ids
+        }
+
+    def _nearest_cluster_id(
+        self,
+        sample_vector,
+        major_cluster_ids: list[int],
+        major_centroids: dict[int, Any],
+    ) -> int:
+        centroid_vectors = [major_centroids[cluster_id] for cluster_id in major_cluster_ids]
+        distances = cosine_distances([sample_vector], centroid_vectors)[0]
+        nearest_idx = min(range(len(distances)), key=lambda idx: distances[idx])
+        return major_cluster_ids[nearest_idx]
+
+    def _reassign_tiny_clusters(
+        self,
+        labels: list[int],
+        dense_matrix,
+        min_cluster_size: int,
+    ) -> tuple[list[int], int]:
+        if not labels:
+            return labels, 0
+
+        clusters = self._group_cluster_indices(labels)
+        major_cluster_ids, tiny_cluster_ids = self._split_clusters_by_size(clusters, min_cluster_size)
+        if not tiny_cluster_ids or not major_cluster_ids:
+            return labels, 0
+
+        major_centroids = self._build_cluster_centroids(
+            clusters=clusters,
+            dense_matrix=dense_matrix,
+            allowed_cluster_ids=set(major_cluster_ids),
+        )
+
+        reassigned_labels = list(labels)
+        reassigned_count = 0
+        for tiny_cluster_id in tiny_cluster_ids:
+            for sample_idx in clusters[tiny_cluster_id]:
+                sample_vector = dense_matrix[sample_idx]
+                reassigned_labels[sample_idx] = self._nearest_cluster_id(
+                    sample_vector=sample_vector,
+                    major_cluster_ids=major_cluster_ids,
+                    major_centroids=major_centroids,
+                )
+                reassigned_count += 1
+
+        return reassigned_labels, reassigned_count
+
+    def _group_cluster_indices(self, labels) -> _ClusterIndices:
+        clusters: _ClusterIndices = {}
         for idx, cluster_id in enumerate(labels):
             clusters.setdefault(int(cluster_id), []).append(idx)
         return clusters
 
+    def _serialize_opportunity(self, opportunity: Opportunity) -> dict[str, str]:
+        return {
+            "id": str(opportunity.id),
+            "designation": opportunity.designation,
+        }
+
+    def _build_cluster_record(self, cluster_id: int, cluster_items: list[_PreparedOpportunity]) -> dict:
+        opportunities = [item.opportunity for item in cluster_items]
+        keywords = self._extract_ranked_keywords(cluster_items)
+        return {
+            "cluster_id": cluster_id,
+            "total_opportunities": len(opportunities),
+            "summary_keywords": self._extract_summary(keywords),
+            "keywords": keywords,
+            "opportunities": [
+                self._serialize_opportunity(opportunity)
+                for opportunity in opportunities
+            ],
+        }
+
     def _build_cluster_payload(
         self,
         prepared: list[_PreparedOpportunity],
-        clusters: dict[int, list[int]],
+        clusters: _ClusterIndices,
     ) -> list[dict]:
-        sorted_cluster_ids = sorted(
+        cluster_ids = sorted(
             clusters,
             key=lambda cluster_id: len(clusters[cluster_id]),
             reverse=True,
         )
-        strong_cluster_ids = sorted_cluster_ids[: min(self.k, len(sorted_cluster_ids))]
 
         payload: list[dict] = []
-        for cluster_id in strong_cluster_ids:
+        for cluster_id in cluster_ids:
             cluster_items = [prepared[i] for i in clusters[cluster_id]]
-            opportunities = [item.opportunity for item in cluster_items]
-            keywords = self._extract_ranked_keywords(cluster_items)
-
-            payload.append(
-                {
-                    "cluster_id": cluster_id,
-                    "total_opportunities": len(opportunities),
-                    "summary_keywords": self._extract_summary(keywords),
-                    "keywords": keywords,
-                    "opportunities": [
-                        {
-                            "id": str(opportunity.id),
-                            "designation": opportunity.designation,
-                        }
-                        for opportunity in opportunities
-                    ],
-                }
-            )
+            payload.append(self._build_cluster_record(cluster_id, cluster_items))
 
         return payload
+
+    def _build_cluster_result(
+        self,
+        prepared: list[_PreparedOpportunity],
+        clusters: _ClusterIndices,
+        natural_discovered_k: int,
+        selected_distance_threshold: float | None,
+        min_cluster_size: int,
+        reassigned_opportunities: int,
+    ) -> dict:
+        discovered_k = len(clusters)
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "discovered_k": discovered_k,
+            "natural_discovered_k": natural_discovered_k,
+            "selected_distance_threshold": selected_distance_threshold,
+            "min_cluster_size": min_cluster_size,
+            "reassigned_opportunities": reassigned_opportunities,
+            "dynamic_stopwords": sorted(self._dynamic_stopwords),
+            "explicit_stopwords": sorted(self._explicit_stopwords),
+            "clusters": self._build_cluster_payload(prepared, clusters),
+        }
 
     def cluster(self) -> dict:
         prepared = self._prepare_opportunities()
@@ -332,19 +496,30 @@ class JDClusteringService:
 
         processed_corpus = [item.processed_text for item in prepared]
         tfidf_matrix = TfidfVectorizer(ngram_range=(1, 3), max_df=0.9).fit_transform(processed_corpus)
+        dense_matrix = tfidf_matrix.toarray()
         sample_count = len(prepared)
-        effective_k = self._find_best_cluster_count(tfidf_matrix, sample_count)
-        labels = self._fit_labels(tfidf_matrix, sample_count, effective_k)
+        min_cluster_size = self._resolve_min_cluster_size(sample_count)
+        labels, natural_discovered_k, selected_distance_threshold = self._find_natural_labels(
+            tfidf_matrix,
+            dense_matrix,
+            sample_count,
+            min_cluster_size,
+        )
+        labels, reassigned_opportunities = self._reassign_tiny_clusters(
+            labels,
+            dense_matrix,
+            min_cluster_size,
+        )
         clusters = self._group_cluster_indices(labels)
 
-        return {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "max_k": self.k,
-            "effective_k": effective_k,
-            "dynamic_stopwords": sorted(self._dynamic_stopwords),
-            "explicit_stopwords": sorted(self._explicit_stopwords),
-            "clusters": self._build_cluster_payload(prepared, clusters),
-        }
+        return self._build_cluster_result(
+            prepared=prepared,
+            clusters=clusters,
+            natural_discovered_k=natural_discovered_k,
+            selected_distance_threshold=selected_distance_threshold,
+            min_cluster_size=min_cluster_size,
+            reassigned_opportunities=reassigned_opportunities,
+        )
 
     def save_clusters(self, cluster_result: dict) -> dict[str, str]:
         _PROJECT_DATA.mkdir(parents=True, exist_ok=True)
