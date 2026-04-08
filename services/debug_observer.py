@@ -7,7 +7,6 @@ Run from project root (with venv active):
 """
 
 import asyncio
-import json
 import re
 import sys
 import urllib.parse
@@ -15,15 +14,13 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-# Reuse stealth helpers from the main observer
-from services.observer import (
-    _STEALTH_SCRIPT,
-    _USER_AGENT,
-    _PROJECT_DATA,
-    human_delay,
-    human_type,
-)
 from configs import LINKEDIN_CREDENTIALS, LOGIN_WAIT_SECONDS
+from services.human_actions import HumanActions
+from services.playwright_runtime import PlaywrightRuntime
+
+_PROJECT_DATA = Path(__file__).parent.parent / "project_data"
+_ACTIONS = HumanActions()
+_RUNTIME = PlaywrightRuntime()
 
 SCREENSHOTS = _PROJECT_DATA / "debug_screenshots"
 SCREENSHOTS.mkdir(parents=True, exist_ok=True)
@@ -70,33 +67,24 @@ async def main():
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
             headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-infobars",
-            ],
+            args=["--start-maximized"],
         )
-        context = await browser.new_context(
-            viewport={"width": 1366, "height": 768},
-            user_agent=_USER_AGENT,
-            locale="en-US",
-        )
-        await context.add_init_script(_STEALTH_SCRIPT)
+        context = await _RUNTIME.new_context(browser)
         page = await context.new_page()
 
         # ── STEP 1: Login ────────────────────────────────────────────────────
         print("\n=== STEP 1: Login ===")
         await page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
-        await human_delay(1.5, 2.5)
+        await _ACTIONS.delay(1.5, 2.5)
         await save_screenshot(page, "01_login_page")
         await dump_html_around(page, "#username", "email_field")
         await dump_html_around(page, "#password", "password_field")
         await dump_html_around(page, "button[type='submit']", "submit_button")
 
-        await human_type(page, "#username", email)
-        await human_delay(0.4, 1.0)
-        await human_type(page, "#password", password)
-        await human_delay(0.3, 0.7)
+        await _ACTIONS.type_text(page, "#username", email)
+        await _ACTIONS.delay(0.4, 1.0)
+        await _ACTIONS.type_text(page, "#password", password)
+        await _ACTIONS.delay(0.3, 0.7)
         await page.click("button[type='submit']")
         await save_screenshot(page, "02_after_submit")
 
@@ -106,7 +94,7 @@ async def main():
             print("  Login confirmed.")
         except Exception:
             print("  Timeout — proceeding.")
-        await human_delay(1.5, 2.5)
+        await _ACTIONS.delay(1.5, 2.5)
         await save_screenshot(page, "03_post_login")
 
         # ── STEP 2: Navigate to jobs page ────────────────────────────────────
@@ -118,7 +106,7 @@ async def main():
         print(f"  Body text (first 500): {body_text[:500]}")
 
         await page.goto("https://www.linkedin.com/jobs/", wait_until="domcontentloaded")
-        await human_delay(2.0, 3.5)
+        await _ACTIONS.delay(2.0, 3.5)
         print(f"  Jobs URL: {page.url}")
         print(f"  Jobs title: {await page.title()}")
         await save_screenshot(page, "04_jobs_page")
@@ -165,8 +153,8 @@ async def main():
             el = await page.query_selector(sel)
             if el and await el.is_visible():
                 print(f"  Typing into: {sel}")
-                await human_type(page, sel, query)
-                await human_delay(0.5, 1.0)
+                await _ACTIONS.type_text(page, sel, query)
+                await _ACTIONS.delay(0.5, 1.0)
                 await page.keyboard.press("Enter")
                 typed = True
                 break
@@ -180,7 +168,7 @@ async def main():
         print(f"  URL after search: {page.url}")
         print(f"  Title after search: {await page.title()}")
 
-        await human_delay(4.0, 6.0)
+        await _ACTIONS.delay(4.0, 6.0)
 
         # ── STEP 4: Find job IDs — search full card HTML + click strategy ─────
         print("\n=== STEP 4: Job ID extraction strategies ===")
@@ -235,7 +223,7 @@ async def main():
         print(f"\nAll screenshots saved to: {SCREENSHOTS}")
         print("Inspect them + the output above, then update source_doms.json.")
 
-        await human_delay(2.0, 3.0)
+        await _ACTIONS.delay(2.0, 3.0)
         await browser.close()
 
 

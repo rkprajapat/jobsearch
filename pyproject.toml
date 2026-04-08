@@ -8,4 +8,5 @@ dependencies = [
     "pandas==3.0.2",
     "playwright==1.58.0",
     "pydantic==2.12.5",
+    "spacy==3.8.13",
 ]
