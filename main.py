@@ -1,6 +1,12 @@
+import asyncio
+from services.observer import Observer
+
+
 def main():
-    print("Hello from jobsearch!")
+    observer = Observer()
+    asyncio.run(observer.observe())
 
 
 if __name__ == "__main__":
     main()
+
