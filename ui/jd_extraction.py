@@ -57,7 +57,7 @@ async def generate_cluster_report():
         spinner.delete()
 
 
-def extraction_page():
+async def extraction_page():
     with ui.column().classes("w-full min-h-screen items-center px-4 py-8"):
         with ui.column().classes("w-full max-w-5xl gap-5"):
             with ui.row().classes(
@@ -71,8 +71,8 @@ def extraction_page():
                         "Run data collection pipelines and generate reports from one focused workspace."
                     ).classes("text-slate-600")
                 ui.button(
-                    "Back to Dashboard",
-                    on_click=lambda: ui.navigate.to("/"),
+                    "Go Back",
+                    on_click=lambda: ui.navigate.back(),
                     icon="arrow_back",
                 ).props("outline").classes("border-slate-300 text-slate-700")
 
@@ -113,3 +113,14 @@ def extraction_page():
                     on_click=generate_cluster_report,
                     icon="auto_graph",
                 ).classes("bg-slate-800 text-white mt-3 rounded-lg")
+
+            # Extraction Configuration
+            with ui.column().classes("glass-card p-5 w-full"):
+                ui.label("Extraction Configuration").classes(
+                    "text-xl font-bold text-slate-800"
+                )
+                ui.button(
+                    "Edit Configuration",
+                    on_click=lambda: ui.navigate.to("/config"),
+                    icon="settings",
+                ).classes("bg-blue-600 text-white mt-3 rounded-lg")

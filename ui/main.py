@@ -1,5 +1,6 @@
 from nicegui import ui
 
+from ui.extraction_config import render_config
 from ui.jd_extraction import extraction_page
 
 
@@ -83,13 +84,19 @@ def main_page():
 
 
 @ui.page("/extraction")
-def extraction():
+async def extraction():
     _inject_theme()
-    extraction_page()
+    await extraction_page()
+
+
+@ui.page("/config")
+async def config_page():
+    _inject_theme()
+    await render_config()
 
 
 @ui.page("/application")
-def application():
+async def application():
     _inject_theme()
 
     with ui.column().classes("w-full min-h-screen items-center px-4 py-8"):
@@ -105,8 +112,8 @@ def application():
                         "Plan your next 7 days of applications with focus and consistency."
                     ).classes("text-slate-600")
                 ui.button(
-                    "Back to Dashboard",
-                    on_click=lambda: ui.navigate.to("/"),
+                    "Go Back",
+                    on_click=lambda: ui.navigate.back(),
                     icon="arrow_back",
                 ).props("outline").classes("border-slate-300 text-slate-700")
 
