@@ -2,6 +2,7 @@ from nicegui import ui
 
 from ui.extraction_config import render_config
 from ui.jd_extraction import extraction_page
+from ui.applications import show_opportunities
 
 
 def _inject_theme() -> None:
@@ -99,34 +100,7 @@ async def config_page():
 async def application():
     _inject_theme()
 
-    with ui.column().classes("w-full min-h-screen items-center px-4 py-8"):
-        with ui.column().classes("w-full max-w-5xl gap-5"):
-            with ui.row().classes(
-                "w-full items-center justify-between flex-wrap gap-3"
-            ):
-                with ui.column().classes("gap-0"):
-                    ui.label("Application Workspace").classes(
-                        "brand-title text-3xl font-extrabold text-slate-800"
-                    )
-                    ui.label(
-                        "Plan your next 7 days of applications with focus and consistency."
-                    ).classes("text-slate-600")
-                ui.button(
-                    "Go Back",
-                    on_click=lambda: ui.navigate.back(),
-                    icon="arrow_back",
-                ).props("outline").classes("border-slate-300 text-slate-700")
-
-            with ui.row().classes("w-full gap-4 flex-wrap md:flex-nowrap"):
-                with ui.column().classes("glass-card p-5 flex-1 min-w-[260px]"):
-                    ui.label("Today").classes("text-lg font-bold text-slate-800")
-                    ui.label("No pending application actions configured yet.").classes(
-                        "text-slate-600 mt-1"
-                    )
-                    ui.button("Add Task (Soon)", icon="add_task").props("flat").classes(
-                        "text-teal-700 mt-2"
-                    )
-
+    await show_opportunities()
 
 def start_web_ui():
     ui.run(title="Job Search Dashboard")

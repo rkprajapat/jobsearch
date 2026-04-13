@@ -1,0 +1,1 @@
+from services.generator import generate_response

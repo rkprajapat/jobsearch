@@ -21,6 +21,10 @@ class Opportunity(BaseModel):
     relevant: bool | None = None
     date_posted: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     source_hash: str | None = None
+    applied: bool = False
+    applied_date: datetime | None = None
+    resume_version_used: str | None = None
+    cover_letter_version_used: str | None = None
 
     def __eq__(self, other):
         if isinstance(other, Opportunity):
@@ -57,10 +61,21 @@ def _is_missing_value(value: object) -> bool:
 def _merge_opportunity(existing: Opportunity, incoming: Opportunity) -> Opportunity:
     existing_data = existing.model_dump()
     incoming_data = incoming.model_dump()
+    user_managed_fields = {
+        "relevant",
+        "applied",
+        "applied_date",
+        "resume_version_used",
+        "cover_letter_version_used",
+    }
 
     merged_data: dict[str, Any] = {}
     for field_name, existing_value in existing_data.items():
         incoming_value = incoming_data.get(field_name)
+        if field_name in user_managed_fields and incoming_value is not None:
+            merged_data[field_name] = incoming_value
+            continue
+
         merged_data[field_name] = (
             incoming_value
             if _is_missing_value(existing_value)
