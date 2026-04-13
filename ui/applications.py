@@ -3,12 +3,15 @@ Applications management UI for tracking job opportunities and application status
 """
 from nicegui import ui, run
 import humanize
+import traceback
+import asyncio
 
 from models.opportunity import Opportunity, load_opportunities
 from ui.spinners import create_overlay_spinner
 from ui.constants import CLASSES, LAYOUT, CONTENT, SWITCH_PROPS, BUTTON_PROPS
 from ui.application_state import ApplicationStateManager
 from ui.utils import DescriptionToggle, format_label
+from agents.resume_builder.agent import ResumeAgent
 
 
 async def show_opportunities() -> None:
@@ -42,6 +45,7 @@ async def show_opportunities() -> None:
     
     except Exception as e:
         ui.notify(format_label(CONTENT["error_loading"], e=e), type="negative") # type: ignore
+        traceback.print_exc()
     finally:
         spinner.delete()
 
@@ -152,10 +156,26 @@ async def _render_opportunity_card(
         # Action button
         ui.button(
             CONTENT["button_prepare_app"], # type: ignore
-            on_click=lambda: ui.notify(
-                "This will prepare your resume and cover letter for this opportunity."
-            )
+            on_click=lambda: _prepare_application(opp)
         ).props(BUTTON_PROPS["prepare"]).classes(CLASSES["button_secondary"])
+
+async def _prepare_application(opp: Opportunity) -> None:
+    """Prepare tailored resume and cover letter for the opportunity."""
+    print(f"Preparing application for: {opp.designation} at {opp.company_name}: ({opp.job_description[:100]}...)")  # Debug log
+
+    if not opp.job_description:
+        ui.notify("No job description available to tailor application.", type="warning")
+        return
+
+    spinner = create_overlay_spinner('Preparing tailored resume and cover letter...')
+    try:
+        resume_agent = ResumeAgent()
+        tailored_resume = await run.cpu_bound(resume_agent.prepare_resume, opp.job_description)
+        ui.notify("Tailored resume and cover letter prepared successfully.")
+    except Exception as e:
+        ui.notify(f"Failed to prepare application: {e}", type="negative")
+    finally:
+        spinner.delete()
 
 
 def _render_description(job_description: str) -> None:
@@ -163,7 +183,7 @@ def _render_description(job_description: str) -> None:
     description_toggle = DescriptionToggle(job_description)
     
     with ui.column().classes(LAYOUT["description_column"]):
-        desc_label = ui.label(description_toggle.get_current_text()).classes(CLASSES["card_meta"])
+        desc_label = ui.markdown(description_toggle.get_current_text()).classes(CLASSES["card_meta"])
         
         # Only show toggle button if description needs truncation
         if len(job_description) > int(CONTENT["description_preview_length"]):
@@ -176,5 +196,5 @@ def _render_description(job_description: str) -> None:
 def _toggle_description(label, button, toggle_state: DescriptionToggle) -> None:
     """Toggle job description expansion."""
     new_text, new_button_label = toggle_state.toggle()
-    label.text = new_text
+    label.content = new_text
     button.text = new_button_label

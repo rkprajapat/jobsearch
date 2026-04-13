@@ -58,7 +58,7 @@ class ApplicationStateManager:
         """Get opportunities sorted by relevance, application status, and date."""
         sorted_opps = sorted(
             self.opportunities,
-            key=lambda opp: (opp.relevant, not opp.applied, opp.date_posted),
+            key=lambda opp: (opp.relevant is True, not opp.applied, opp.date_posted),
             reverse=True
         )
         return sorted_opps

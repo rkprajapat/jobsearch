@@ -36,7 +36,7 @@ CONTENT: dict[str, str | int] = {
     "warning_no_opportunities": "No opportunities found.",
     "button_prepare_app": "Prepare Application",
     "button_back": "Go Back",
-    "button_show_more": "Show more text",
+    "button_show_more": "Show more",
     "button_show_less": "Show less",
     "switch_relevant": "Relevant",
     "switch_applied": "Applied",
