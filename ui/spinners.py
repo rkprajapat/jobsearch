@@ -3,7 +3,7 @@
 from nicegui import ui
 
 
-def create_overlay_spinner(message: str | None = None) -> ui.dialog:
+def create_overlay_spinner(message: str | int | None = None) -> ui.dialog:
     """
     Create a full-screen overlay spinner with an optional message.
 
@@ -29,7 +29,7 @@ def create_overlay_spinner(message: str | None = None) -> ui.dialog:
     ):
         with ui.column().classes("items-center"):
             if message:
-                ui.label(message).classes("text-white text-lg mb-4")
+                ui.label(str(message)).classes("text-white text-lg mb-4")
             ui.spinner(size="64px", color="#ffffff")
 
     dialog.open()

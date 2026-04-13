@@ -41,7 +41,7 @@ async def show_opportunities() -> None:
             await _render_opportunity_card(opp, state_manager)
     
     except Exception as e:
-        ui.notify(format_label(CONTENT["error_loading"], e=e), type="negative")
+        ui.notify(format_label(CONTENT["error_loading"], e=e), type="negative") # type: ignore
     finally:
         spinner.delete()
 
@@ -51,7 +51,7 @@ def _render_header() -> None:
     with ui.row().classes(LAYOUT["header_row"]):
         ui.label("Applications").classes(CLASSES["page_title"])
         ui.button(
-            CONTENT["button_back"],
+            CONTENT["button_back"], # type: ignore
             on_click=lambda: ui.navigate.back(),
             icon="arrow_back",
         ).props(BUTTON_PROPS["back"]).classes(CLASSES["button_outline"])
@@ -66,15 +66,15 @@ def _render_summary(state_manager: ApplicationStateManager) -> dict:
     """
     with ui.row().classes(LAYOUT["summary_row"]):
         total_label = ui.label(
-            format_label(CONTENT["label_total"], count=len(state_manager.opportunities))
+            format_label(CONTENT["label_total"], count=len(state_manager.opportunities)) # type: ignore
         ).classes(CLASSES["stat_label_neutral"])
         
         applied_label = ui.label(
-            format_label(CONTENT["label_applied"], count=state_manager.get_applied_count())
+            format_label(CONTENT["label_applied"], count=state_manager.get_applied_count()) # type: ignore
         ).classes(CLASSES["stat_label_positive"])
         
         not_applied_label = ui.label(
-            format_label(CONTENT["label_not_applied"], count=state_manager.get_not_applied_count())
+            format_label(CONTENT["label_not_applied"], count=state_manager.get_not_applied_count()) # type: ignore
         ).classes(CLASSES["stat_label_negative"])
     
     return {
@@ -87,10 +87,10 @@ def _render_summary(state_manager: ApplicationStateManager) -> dict:
 def _update_summary(labels: dict, state_manager: ApplicationStateManager) -> None:
     """Update summary labels with current counts."""
     labels["applied"].text = format_label(
-        CONTENT["label_applied"], count=state_manager.get_applied_count()
+        CONTENT["label_applied"], count=state_manager.get_applied_count() # type: ignore
     )
     labels["not_applied"].text = format_label(
-        CONTENT["label_not_applied"], count=state_manager.get_not_applied_count()
+        CONTENT["label_not_applied"], count=state_manager.get_not_applied_count() # type: ignore
     )
 
 
@@ -116,8 +116,8 @@ async def _render_opportunity_card(
         with ui.row().classes(LAYOUT["card_header"]):
             with ui.column().classes(LAYOUT["card_column_left"]):
                 ui.link(
-                    text=opp.designation,
-                    target=opp.source_url,
+                    text=opp.designation or "",
+                    target=opp.source_url or "",
                     new_tab=True
                 ).classes(CLASSES["card_title"])
             
@@ -125,25 +125,25 @@ async def _render_opportunity_card(
             with ui.column().classes(LAYOUT["card_column_right"]):
                 with ui.column().classes(LAYOUT["switches_column"]):
                     ui.switch(
-                        CONTENT["switch_relevant"],
+                        CONTENT["switch_relevant"], # type: ignore
                         value=bool(opp.relevant),
                         on_change=on_relevant_change
                     ).props(SWITCH_PROPS["relevant"])
                     
                     ui.switch(
-                        CONTENT["switch_applied"],
+                        CONTENT["switch_applied"], # type: ignore
                         value=opp.applied,
                         on_change=on_applied_change
                     ).props(SWITCH_PROPS["applied"])
         
         # Company and location info
-        ui.label(format_label(CONTENT["label_company"], name=opp.company_name)).classes(CLASSES["card_meta"])
-        ui.label(format_label(CONTENT["label_location"], location=opp.location)).classes(CLASSES["card_meta"])
+        ui.label(format_label(CONTENT["label_company"], name=opp.company_name)).classes(CLASSES["card_meta"]) # type: ignore
+        ui.label(format_label(CONTENT["label_location"], location=opp.location)).classes(CLASSES["card_meta"]) # type: ignore
         
         # Posted date
         if opp.date_posted:
             posted_date = humanize.naturaldate(opp.date_posted)
-            ui.label(format_label(CONTENT["label_posted"], date=posted_date)).classes(CLASSES["card_meta"])
+            ui.label(format_label(CONTENT["label_posted"], date=posted_date)).classes(CLASSES["card_meta"]) # type: ignore
         
         # Job description with toggle
         if opp.job_description:
@@ -151,7 +151,7 @@ async def _render_opportunity_card(
         
         # Action button
         ui.button(
-            CONTENT["button_prepare_app"],
+            CONTENT["button_prepare_app"], # type: ignore
             on_click=lambda: ui.notify(
                 "This will prepare your resume and cover letter for this opportunity."
             )
