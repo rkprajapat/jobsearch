@@ -19,8 +19,13 @@ from services.human_actions import HumanActions
 from services.playwright_runtime import PlaywrightRuntime
 from services.source_config import domain_key, load_source_doms
 
-
-_NOISE_PATTERNS = {"privacy", "terms", "business services", "cookie", "linkedin corporation"}
+_NOISE_PATTERNS = {
+    "privacy",
+    "terms",
+    "business services",
+    "cookie",
+    "linkedin corporation",
+}
 
 
 def _parse_posted_date(raw: str | None) -> datetime:
@@ -87,7 +92,11 @@ async def _click_card_by_index(page: Page, doms: dict, idx: int) -> bool:
 def _clean_designation(raw: str | None) -> str | None:
     if not raw:
         return None
-    lines = [line.strip() for line in raw.split("\n") if line.strip() and "(Verified job)" not in line]
+    lines = [
+        line.strip()
+        for line in raw.split("\n")
+        if line.strip() and "(Verified job)" not in line
+    ]
     return lines[0] if lines else None
 
 
@@ -144,7 +153,11 @@ async def collect_opportunities_on_page(
 
             query_params = parse_qs(urlparse(page.url).query)
             job_ids = query_params.get("currentJobId", [])
-            source_url = f"https://www.linkedin.com/jobs/view/{job_ids[0]}/" if job_ids else page.url
+            source_url = (
+                f"https://www.linkedin.com/jobs/view/{job_ids[0]}/"
+                if job_ids
+                else page.url
+            )
 
             opportunity = Opportunity(
                 designation=designation,
@@ -194,7 +207,9 @@ class Observer:
         if doms.get("requires_login") and not (
             LINKEDIN_CREDENTIALS.get("email") and LINKEDIN_CREDENTIALS.get("password")
         ):
-            print(f"Skipping {source}: login required but credentials not set in inputs.json.")
+            print(
+                f"Skipping {source}: login required but credentials not set in inputs.json."
+            )
             return []
 
         page = await context.new_page()
@@ -214,8 +229,12 @@ class Observer:
             await self.actions.delay(2.5, 5.0)
 
             page_num = 1
-            while len(opportunities) < self.jobs_per_source and page_num <= self.max_pages:
-                print(f"  Page {page_num}: collecting cards (have {len(opportunities)} so far)...")
+            while (
+                len(opportunities) < self.jobs_per_source and page_num <= self.max_pages
+            ):
+                print(
+                    f"  Page {page_num}: collecting cards (have {len(opportunities)} so far)..."
+                )
                 batch = await collect_opportunities_on_page(
                     page,
                     doms,
@@ -226,7 +245,10 @@ class Observer:
                 opportunities.extend(batch)
                 print(f"  Page {page_num}: collected {len(batch)} cards.")
 
-                if len(opportunities) >= self.jobs_per_source or page_num >= self.max_pages:
+                if (
+                    len(opportunities) >= self.jobs_per_source
+                    or page_num >= self.max_pages
+                ):
                     break
 
                 has_next = await page.evaluate(
@@ -265,7 +287,9 @@ class Observer:
                 results = await self._observe_source(context, source, all_doms)
 
                 if not results:
-                    raise RuntimeError(f"No opportunities collected from {source} - check if the page structure has changed and update the DOM config accordingly.")
+                    raise RuntimeError(
+                        f"No opportunities collected from {source} - check if the page structure has changed and update the DOM config accordingly."
+                    )
 
                 all_opportunities.extend(results)
                 print(f"--- Collected {len(results)} from {source} ---")

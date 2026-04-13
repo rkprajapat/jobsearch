@@ -71,48 +71,10 @@ The pipeline reads runtime options from `configs/inputs.json`.
 - `stopwords`: explicit words removed from JD clustering text analysis.
 	- Current value: a large custom list defined in `inputs.json`.
 
-## Run Scripts
+## use
 
-Use:
-
-```bash
-python .\main.py [--jd-only] [--cluster]
-```
-
-### Script arguments
-
-- `--jd-only`
-	- Skips opportunity observation/scraping and runs JD extraction + post tasks.
-- `--cluster`
-	- Forces clustering/report regeneration instead of using freshness checks.
-
-### Common commands
-
-- Full pipeline (observe + JD extract + conditional cluster/report):
+Run NiceGUI Web Server
 
 ```bash
 python .\main.py
 ```
-
-- JD extraction and post tasks only:
-
-```bash
-python .\main.py --jd-only
-```
-
-- Full pipeline and force clustering/report refresh:
-
-```bash
-python .\main.py --cluster
-```
-
-- JD-only mode with forced clustering/report refresh:
-
-```bash
-python .\main.py --cluster --jd-only
-```
-
-## Output Behavior
-
-- Clustering is skipped if a recent cluster file exists (within 30 days), unless `--cluster` is set.
-- PDF report generation is skipped if a recent report exists (within 30 days), unless `--cluster` is set.

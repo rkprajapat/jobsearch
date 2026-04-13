@@ -39,7 +39,6 @@ repos:
       - id: mypy
         additional_dependencies:
           - pydantic
-          - types-python-dotenv
         args: ['--ignore-missing-imports']
         exclude: ^tests/
 
@@ -48,5 +47,5 @@ repos:
     rev: 1.9.4
     hooks:
       - id: bandit
-        args: ['-c', '.bandit']
+        args: ['-s', 'B110,B112,B311']
         exclude: ^tests/

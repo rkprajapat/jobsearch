@@ -10,7 +10,6 @@ import asyncio
 import re
 import sys
 import urllib.parse
-from pathlib import Path
 
 from playwright.async_api import async_playwright
 
@@ -89,7 +88,9 @@ async def main():
 
         print(f"Waiting up to {LOGIN_WAIT_SECONDS}s for post-login indicator...")
         try:
-            await page.wait_for_selector("div.global-nav__me", timeout=LOGIN_WAIT_SECONDS * 1_000)
+            await page.wait_for_selector(
+                "div.global-nav__me", timeout=LOGIN_WAIT_SECONDS * 1_000
+            )
             print("  Login confirmed.")
         except Exception:
             print("  Timeout — proceeding.")
@@ -190,11 +191,15 @@ async def main():
             }""")
             print("  Strategy A – numeric IDs in card HTML:")
             for c in id_scan:
-                print(f"    key={c['key']} htmlLen={c['htmlLen']} numbers={c['numericMatches']}")
+                print(
+                    f"    key={c['key']} htmlLen={c['htmlLen']} numbers={c['numericMatches']}"
+                )
 
         # Strategy B: click each of first 3 cards, read currentJobId from URL
         print("\n  Strategy B – click card → read URL currentJobId:")
-        cards = await lazy_cols[0].query_selector_all("div[role='button'][componentkey]")
+        cards = await lazy_cols[0].query_selector_all(
+            "div[role='button'][componentkey]"
+        )
         for card in cards[:3]:
             key = await card.get_attribute("componentkey")
             await card.click()

@@ -1,6 +1,5 @@
 import asyncio
 import re
-from urllib.parse import urlparse
 
 from playwright.async_api import Page, async_playwright
 
@@ -71,8 +70,7 @@ class JDExtractor:
                 continue
 
         try:
-            expanded = await page.evaluate(
-                """() => {
+            expanded = await page.evaluate("""() => {
                 const nodes = [...document.querySelectorAll('button, a, span[role="button"]')];
                 for (const node of nodes) {
                     const txt = (node.innerText || '').trim().toLowerCase();
@@ -83,19 +81,22 @@ class JDExtractor:
                     }
                 }
                 return false;
-            }"""
-            )
+            }""")
             if expanded:
                 await self.actions.delay(0.4, 0.9)
         except Exception:
             pass
 
-    async def _extract_description_from_url(self, page: Page, url: str, doms: dict) -> str:
+    async def _extract_description_from_url(
+        self, page: Page, url: str, doms: dict
+    ) -> str:
         selectors = doms.get("jd_description_container")
         if isinstance(selectors, str):
             selectors = [selectors]
         if not selectors:
-            raise RuntimeError("Missing jd_description_container selector config for linkedin.com")
+            raise RuntimeError(
+                "Missing jd_description_container selector config for linkedin.com"
+            )
 
         await self.actions.goto(page, url, wait_until="domcontentloaded")
 
@@ -117,23 +118,35 @@ class JDExtractor:
             except Exception:
                 continue
 
-        raise RuntimeError(f"JD text not captured for {url}. Check selectors and page state.")
+        raise RuntimeError(
+            f"JD text not captured for {url}. Check selectors and page state."
+        )
 
     def _verify_single_persisted_update(self, url: str) -> None:
         latest = load_opportunities()
         for opportunity in latest:
-            if opportunity.source_url == url and opportunity.job_description and opportunity.job_description.strip():
+            if (
+                opportunity.source_url == url
+                and opportunity.job_description
+                and opportunity.job_description.strip()
+            ):
                 return
         raise RuntimeError(f"Persistence verification failed for URL: {url}")
 
     def _verify_persisted_updates(self, targeted_urls: set[str]) -> None:
         latest = load_opportunities()
         by_url = {opp.source_url: opp for opp in latest if opp.source_url}
-        missing_after_save = [
-            url
-            for url in targeted_urls
-            if not by_url.get(url) or not (by_url[url].job_description and by_url[url].job_description.strip())
-        ]
+        missing_after_save = []
+        for url in targeted_urls:
+            persisted = by_url.get(url)
+            persisted_description = (
+                persisted.job_description if persisted is not None else None
+            )
+            if (
+                not isinstance(persisted_description, str)
+                or not persisted_description.strip()
+            ):
+                missing_after_save.append(url)
         if missing_after_save:
             raise RuntimeError(
                 "Persistence verification failed for URLs with missing JD after save: "
@@ -166,10 +179,16 @@ class JDExtractor:
             page = await context.new_page()
             try:
                 if linkedin_doms.get("requires_login"):
-                    await login_linkedin(page, linkedin_doms, LINKEDIN_CREDENTIALS, self.actions)
+                    await login_linkedin(
+                        page, linkedin_doms, LINKEDIN_CREDENTIALS, self.actions
+                    )
 
                 for idx, opportunity in enumerate(targets, start=1):
                     try:
+                        if not opportunity.source_url:
+                            stats["skipped"] += 1
+                            continue
+
                         description = await self._extract_description_from_url(
                             page,
                             opportunity.source_url,
@@ -183,7 +202,9 @@ class JDExtractor:
                             )
                         self._verify_single_persisted_update(opportunity.source_url)
                         stats["updated"] += 1
-                        print(f"[{idx}/{len(targets)}] Updated and saved JD for {opportunity.source_url}")
+                        print(
+                            f"[{idx}/{len(targets)}] Updated and saved JD for {opportunity.source_url}"
+                        )
                     except Exception as exc:
                         stats["failed"] += 1
                         raise RuntimeError(
@@ -202,7 +223,13 @@ class JDExtractor:
             )
 
         if stats["updated"]:
-            self._verify_persisted_updates({opportunity.source_url for opportunity in targets})
+            self._verify_persisted_updates(
+                {
+                    opportunity.source_url
+                    for opportunity in targets
+                    if opportunity.source_url
+                }
+            )
 
         return stats
 

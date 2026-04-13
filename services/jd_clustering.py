@@ -1,23 +1,21 @@
 from __future__ import annotations
 
+import json
+import math
+import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import math
-from pathlib import Path
-import json
-import re
 from typing import Any, Sequence
 
+import spacy
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import cosine_distances
-import spacy
 
-from models.opportunity import Opportunity, load_opportunities
 from configs import PROJECT_DATA_DIR
-
+from models.opportunity import Opportunity, load_opportunities
 
 _CLUSTERS_FILE = PROJECT_DATA_DIR.joinpath("clusters.json")
 
@@ -52,7 +50,9 @@ class JDClusteringService:
         self.min_cluster_size = min_cluster_size
         self._nlp = self._load_nlp()
         self._dynamic_stopwords: set[str] = set()
-        self._explicit_stopwords = self._normalize_stopword_terms(explicit_stopwords or [])
+        self._explicit_stopwords = self._normalize_stopword_terms(
+            explicit_stopwords or []
+        )
         self._explicit_stopwords_unigrams = {
             term for term in self._explicit_stopwords if " " not in term
         }
@@ -69,7 +69,9 @@ class JDClusteringService:
         try:
             return spacy.load("en_core_web_sm")
         except Exception:
-            print("en_core_web_sm is not available. Falling back to spaCy blank English model.")
+            print(
+                "en_core_web_sm is not available. Falling back to spaCy blank English model."
+            )
             return spacy.blank("en")
 
     def _normalize_lemma(self, token) -> str | None:
@@ -125,7 +127,10 @@ class JDClusteringService:
             matched = False
             for phrase_tokens in self._explicit_stopword_phrase_tokens:
                 phrase_len = len(phrase_tokens)
-                if i + phrase_len <= len(tokens) and tuple(tokens[i : i + phrase_len]) == phrase_tokens:
+                if (
+                    i + phrase_len <= len(tokens)
+                    and tuple(tokens[i : i + phrase_len]) == phrase_tokens
+                ):
                     i += phrase_len
                     matched = True
                     break
@@ -143,14 +148,20 @@ class JDClusteringService:
     ) -> list[_PreparedOpportunity]:
         filtered: list[_PreparedOpportunity] = []
         for item in prepared:
-            filtered_tokens = [token for token in item.processed_text.split() if token not in blocked_terms]
+            filtered_tokens = [
+                token
+                for token in item.processed_text.split()
+                if token not in blocked_terms
+            ]
             if blocked_terms is self._explicit_stopwords_unigrams:
                 filtered_tokens = self._remove_phrase_stopwords(filtered_tokens)
 
             if not filtered_tokens:
                 continue
 
-            filtered_keywords = [lemma for lemma in item.keyword_lemmas if lemma not in blocked_terms]
+            filtered_keywords = [
+                lemma for lemma in item.keyword_lemmas if lemma not in blocked_terms
+            ]
             filtered.append(
                 _PreparedOpportunity(
                     opportunity=item.opportunity,
@@ -167,7 +178,9 @@ class JDClusteringService:
             if not raw_jd:
                 continue
 
-            processed_text, keyword_lemmas = self._extract_processed_and_keywords(raw_jd)
+            processed_text, keyword_lemmas = self._extract_processed_and_keywords(
+                raw_jd
+            )
             if not processed_text:
                 continue
 
@@ -182,7 +195,9 @@ class JDClusteringService:
         if not prepared:
             return []
 
-        explicit_filtered = self._filter_prepared(prepared, self._explicit_stopwords_unigrams)
+        explicit_filtered = self._filter_prepared(
+            prepared, self._explicit_stopwords_unigrams
+        )
         if not explicit_filtered:
             return []
 
@@ -192,7 +207,9 @@ class JDClusteringService:
 
         return self._filter_prepared(explicit_filtered, self._dynamic_stopwords)
 
-    def _detect_dynamic_stopwords(self, prepared: list[_PreparedOpportunity]) -> set[str]:
+    def _detect_dynamic_stopwords(
+        self, prepared: list[_PreparedOpportunity]
+    ) -> set[str]:
         if not prepared:
             return set()
 
@@ -225,7 +242,9 @@ class JDClusteringService:
                 terms.append(" ".join(tokens[i : i + n]))
         return terms
 
-    def _extract_ranked_keywords(self, cluster_items: list[_PreparedOpportunity]) -> list[str]:
+    def _extract_ranked_keywords(
+        self, cluster_items: list[_PreparedOpportunity]
+    ) -> list[str]:
         if not cluster_items:
             return []
 
@@ -248,7 +267,6 @@ class JDClusteringService:
         blocked_terms = self._dynamic_stopwords | self._explicit_stopwords
         return [term for term, _, _, _ in scored_terms if term not in blocked_terms]
 
-
     def _split_sentences(self, text: str) -> list[str]:
         if not text:
             return []
@@ -257,7 +275,11 @@ class JDClusteringService:
         base_sentences: list[str] = []
         try:
             doc = self._nlp(text)
-            base_sentences = [sent.text.strip() for sent in doc.sents if sent.text and sent.text.strip()]
+            base_sentences = [
+                sent.text.strip()
+                for sent in doc.sents
+                if sent.text and sent.text.strip()
+            ]
         except Exception:
             base_sentences = []
 
@@ -316,7 +338,9 @@ class JDClusteringService:
 
         return refined_sentences
 
-    def _build_keyword_terms(self, keywords: list[str]) -> tuple[set[str], set[tuple[str, ...]]]:
+    def _build_keyword_terms(
+        self, keywords: list[str]
+    ) -> tuple[set[str], set[tuple[str, ...]]]:
         unigram_terms: set[str] = set()
         phrase_terms: set[tuple[str, ...]] = set()
         for keyword in keywords:
@@ -419,7 +443,9 @@ class JDClusteringService:
         # Adaptive default: at least 3 members, about 5% of samples on larger datasets.
         return min(sample_count, max(3, math.ceil(sample_count * 0.05)))
 
-    def _build_threshold_candidates(self, merge_distances: list[float], max_candidates: int = 30) -> list[float]:
+    def _build_threshold_candidates(
+        self, merge_distances: list[float], max_candidates: int = 30
+    ) -> list[float]:
         if not merge_distances:
             return []
 
@@ -454,7 +480,10 @@ class JDClusteringService:
 
         silhouette = silhouette_score(tfidf_matrix, labels_array, metric="cosine")
         largest_share = max(cluster_sizes) / sample_count
-        tiny_share = sum(size for size in cluster_sizes if size < min_cluster_size) / sample_count
+        tiny_share = (
+            sum(size for size in cluster_sizes if size < min_cluster_size)
+            / sample_count
+        )
 
         # Penalize dominant and tiny-fragment-heavy solutions for tighter cluster focus.
         score = silhouette - (0.35 * largest_share) - (0.20 * tiny_share)
@@ -478,7 +507,9 @@ class JDClusteringService:
             compute_distances=True,
         ).fit(dense_matrix)
 
-        merge_distances = sorted({float(distance) for distance in base_model.distances_ if distance > 0})
+        merge_distances = sorted(
+            {float(distance) for distance in base_model.distances_ if distance > 0}
+        )
         if not merge_distances:
             return [0] * sample_count, 1, None
 
@@ -543,7 +574,9 @@ class JDClusteringService:
         major_cluster_ids: list[int],
         major_centroids: dict[int, Any],
     ) -> int:
-        centroid_vectors = [major_centroids[cluster_id] for cluster_id in major_cluster_ids]
+        centroid_vectors = [
+            major_centroids[cluster_id] for cluster_id in major_cluster_ids
+        ]
         distances = cosine_distances([sample_vector], centroid_vectors)[0]
         nearest_idx = min(range(len(distances)), key=lambda idx: distances[idx])
         return major_cluster_ids[nearest_idx]
@@ -558,7 +591,9 @@ class JDClusteringService:
             return labels, 0
 
         clusters = self._group_cluster_indices(labels)
-        major_cluster_ids, tiny_cluster_ids = self._split_clusters_by_size(clusters, min_cluster_size)
+        major_cluster_ids, tiny_cluster_ids = self._split_clusters_by_size(
+            clusters, min_cluster_size
+        )
         if not tiny_cluster_ids or not major_cluster_ids:
             return labels, 0
 
@@ -588,22 +623,26 @@ class JDClusteringService:
             clusters.setdefault(int(cluster_id), []).append(idx)
         return clusters
 
-    def _serialize_opportunity(self, opportunity: Opportunity) -> dict[str, str]:
+    def _serialize_opportunity(self, opportunity: Opportunity) -> dict[str, str | None]:
         return {
             "id": str(opportunity.id),
             "designation": opportunity.designation,
             "company_name": opportunity.company_name,
-            "url": opportunity.source_url
+            "url": opportunity.source_url,
         }
 
-    def _build_cluster_record(self, cluster_id: int, cluster_items: list[_PreparedOpportunity]) -> dict:
+    def _build_cluster_record(
+        self, cluster_id: int, cluster_items: list[_PreparedOpportunity]
+    ) -> dict:
         opportunities = [item.opportunity for item in cluster_items]
         keywords = self._extract_ranked_keywords(cluster_items)
         return {
             "cluster_id": cluster_id,
             "total_opportunities": len(opportunities),
             "keywords": keywords,
-            "keyword_sentences": self._extract_keyword_sentences(cluster_items, keywords),
+            "keyword_sentences": self._extract_keyword_sentences(
+                cluster_items, keywords
+            ),
             "opportunities": [
                 self._serialize_opportunity(opportunity)
                 for opportunity in opportunities
@@ -653,18 +692,24 @@ class JDClusteringService:
     def cluster(self) -> dict:
         prepared = self._prepare_opportunities()
         if not prepared:
-            raise ValueError("No opportunities with usable job descriptions were found.")
+            raise ValueError(
+                "No opportunities with usable job descriptions were found."
+            )
 
         processed_corpus = [item.processed_text for item in prepared]
-        tfidf_matrix = TfidfVectorizer(ngram_range=(1, 3), max_df=0.9).fit_transform(processed_corpus)
+        tfidf_matrix = TfidfVectorizer(ngram_range=(1, 3), max_df=0.9).fit_transform(
+            processed_corpus
+        )
         dense_matrix = tfidf_matrix.toarray()
         sample_count = len(prepared)
         min_cluster_size = self._resolve_min_cluster_size(sample_count)
-        labels, natural_discovered_k, selected_distance_threshold = self._find_natural_labels(
-            tfidf_matrix,
-            dense_matrix,
-            sample_count,
-            min_cluster_size,
+        labels, natural_discovered_k, selected_distance_threshold = (
+            self._find_natural_labels(
+                tfidf_matrix,
+                dense_matrix,
+                sample_count,
+                min_cluster_size,
+            )
         )
         labels, reassigned_opportunities = self._reassign_tiny_clusters(
             labels,

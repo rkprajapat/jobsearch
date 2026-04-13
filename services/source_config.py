@@ -1,9 +1,8 @@
 import json
 import sys
-from pathlib import Path
 from urllib.parse import urlparse
 
-from configs import PROJECT_DATA_DIR, DOMS_FILE_PATH
+from configs import DOMS_FILE_PATH
 
 doms_path = DOMS_FILE_PATH
 

@@ -1,18 +1,16 @@
-import asyncio
-from datetime import datetime, timedelta, timezone
 import json
-import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
 from configs import (
     CLUSTERING_EXPLICIT_STOPWORDS,
     CLUSTERING_MIN_CLUSTER_SIZE,
     CLUSTERING_VERSIONED_OUTPUT,
-    PROJECT_DATA_DIR
-    
+    PROJECT_DATA_DIR,
 )
-from services.observer import Observer
 from services.jd_clustering import JDClusteringService
 from services.jd_extractor import run_jd_extractor
+from services.observer import Observer
 from services.opportunities_report import ClusterPDFReportService
 
 _CLUSTERS_FILE = PROJECT_DATA_DIR.joinpath("clusters.json")
@@ -32,10 +30,12 @@ def _read_clusters_generated_at(clusters_file: Path) -> datetime | None:
     try:
         with open(clusters_file, "r", encoding="utf-8") as file:
             payload = json.load(file)
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return None
 
-    generated_at_raw = payload.get("generated_at") if isinstance(payload, dict) else None
+    generated_at_raw = (
+        payload.get("generated_at") if isinstance(payload, dict) else None
+    )
     if not isinstance(generated_at_raw, str):
         return None
 

@@ -1,4 +1,5 @@
 """This module provides a function to create spinners and loaders in the current UI context."""
+
 from nicegui import ui
 
 

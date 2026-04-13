@@ -32,7 +32,9 @@ class HumanActions:
     async def mouse_move(self, page: Page, x: int, y: int) -> None:
         steps = random.randint(12, 28)
         for _ in range(steps):
-            await page.mouse.move(x + random.randint(-3, 3), y + random.randint(-3, 3), steps=1)
+            await page.mouse.move(
+                x + random.randint(-3, 3), y + random.randint(-3, 3), steps=1
+            )
             await self.delay(0.01, 0.07)
 
     async def click_locator(self, page: Page, locator: Locator) -> None:
@@ -50,6 +52,8 @@ class HumanActions:
         await page.keyboard.press(key, delay=random.randint(35, 140))
         await self.delay(0.08, 0.25)
 
-    async def goto(self, page: Page, url: str, wait_until: str = "domcontentloaded") -> None:
+    async def goto(
+        self, page: Page, url: str, wait_until: str = "domcontentloaded"
+    ) -> None:
         await page.goto(url, wait_until=wait_until)
         await self.delay(1.2, 3.4)

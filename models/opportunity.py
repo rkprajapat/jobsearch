@@ -1,9 +1,11 @@
-from pydantic import BaseModel, Field
-from uuid import UUID, uuid4
-from datetime import datetime, timezone
-from pathlib import Path
-import json
 import hashlib
+import json
+from datetime import datetime, timezone
+from typing import Any
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field
+
 from configs import PROJECT_DATA_DIR
 
 _OPPORTUNITIES_FILE = PROJECT_DATA_DIR.joinpath("opportunities.json")
@@ -31,7 +33,14 @@ def load_opportunities() -> list[Opportunity]:
         return []
     try:
         with open(_OPPORTUNITIES_FILE) as f:
-            return [Opportunity(**v) for v in json.load(f).values()]
+            payload = json.load(f)
+            if not isinstance(payload, dict):
+                return []
+            return [
+                Opportunity.model_validate(v)
+                for v in payload.values()
+                if isinstance(v, dict)
+            ]
     except Exception as e:
         print(f"Error loading opportunities: {e}")
         return []
@@ -49,14 +58,17 @@ def _merge_opportunity(existing: Opportunity, incoming: Opportunity) -> Opportun
     existing_data = existing.model_dump()
     incoming_data = incoming.model_dump()
 
-    merged_data: dict[str, object] = {}
+    merged_data: dict[str, Any] = {}
     for field_name, existing_value in existing_data.items():
         incoming_value = incoming_data.get(field_name)
         merged_data[field_name] = (
-            incoming_value if _is_missing_value(existing_value) and not _is_missing_value(incoming_value) else existing_value
+            incoming_value
+            if _is_missing_value(existing_value)
+            and not _is_missing_value(incoming_value)
+            else existing_value
         )
 
-    return Opportunity(**merged_data)
+    return Opportunity.model_validate(merged_data)
 
 
 def save_opportunities(opportunities: "Opportunity | list[Opportunity]") -> bool:
@@ -64,24 +76,32 @@ def save_opportunities(opportunities: "Opportunity | list[Opportunity]") -> bool
         opportunities = [opportunities]
 
     opportunities = [
-        opp.model_copy(update={"source_hash": hashlib.sha256(opp.source_url.encode()).hexdigest()})
+        opp.model_copy(
+            update={"source_hash": hashlib.sha256(opp.source_url.encode()).hexdigest()}
+        )
         for opp in opportunities
         if opp.source_url
     ]
 
     existing_by_hash = {
-        opp.source_hash: opp
-        for opp in load_opportunities()
-        if opp.source_hash
+        opp.source_hash: opp for opp in load_opportunities() if opp.source_hash
     }
     for opp in opportunities:
-        existing = existing_by_hash.get(opp.source_hash)
-        existing_by_hash[opp.source_hash] = _merge_opportunity(existing, opp) if existing else opp
+        source_hash = opp.source_hash
+        if not source_hash:
+            continue
+        existing = existing_by_hash.get(source_hash)
+        existing_by_hash[source_hash] = (
+            _merge_opportunity(existing, opp) if existing else opp
+        )
 
     try:
         with open(_OPPORTUNITIES_FILE, "w") as f:
             json.dump(
-                {opp.source_hash: opp.model_dump() for opp in existing_by_hash.values()},
+                {
+                    opp.source_hash: opp.model_dump()
+                    for opp in existing_by_hash.values()
+                },
                 f,
                 indent=4,
                 default=str,

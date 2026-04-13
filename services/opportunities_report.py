@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from datetime import datetime
 import json
+from datetime import datetime
 from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    KeepTogether,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from configs import PROJECT_DATA_DIR
 
@@ -111,14 +118,22 @@ class ClusterPDFReportService:
         )
         return table
 
-    def _build_opportunities_table(self, opportunities: list[dict], usable_width: float) -> Table:
+    def _build_opportunities_table(
+        self, opportunities: list[dict], usable_width: float
+    ) -> Table:
         rows: list[list[str]] = [["Designation", "Company Name", "URL"]]
         if not opportunities:
             rows.append(["No opportunities attached.", "n/a", "n/a"])
         else:
             for opportunity in opportunities:
-                designation = Paragraph(str(opportunity.get("designation", "Unknown role")), self._body_style)
-                company_name = Paragraph(str(opportunity.get("company_name") or "Unknown company"), self._body_style)
+                designation = Paragraph(
+                    str(opportunity.get("designation", "Unknown role")),
+                    self._body_style,
+                )
+                company_name = Paragraph(
+                    str(opportunity.get("company_name") or "Unknown company"),
+                    self._body_style,
+                )
                 url = Paragraph(str(opportunity.get("url") or "n/a"), self._body_style)
                 rows.append([designation, company_name, url])
 
@@ -156,7 +171,10 @@ class ClusterPDFReportService:
             keywords_line = "No keywords available."
 
         block = [
-            Paragraph(f"Cluster {cluster_id} ({total} opportunities)", self._card_heading_style),
+            Paragraph(
+                f"Cluster {cluster_id} ({total} opportunities)",
+                self._card_heading_style,
+            ),
             Paragraph(f"<b>Top Keywords:</b> {keywords_line}", self._body_style),
             Spacer(1, 2 * mm),
             Paragraph("<b>Top Matching Sentences:</b>", self._body_style),
@@ -166,13 +184,17 @@ class ClusterPDFReportService:
             for idx, sentence in enumerate(keyword_sentences[:20], start=1):
                 block.append(Paragraph(f"{idx}. {str(sentence)}", self._sentence_style))
         else:
-            block.append(Paragraph("No keyword-matching sentences available.", self._sentence_style))
+            block.append(
+                Paragraph(
+                    "No keyword-matching sentences available.", self._sentence_style
+                )
+            )
 
         block.extend(
             [
                 Spacer(1, 2 * mm),
-            self._build_opportunities_table(opportunities, usable_width),
-            Spacer(1, 6 * mm),
+                self._build_opportunities_table(opportunities, usable_width),
+                Spacer(1, 6 * mm),
             ]
         )
         return KeepTogether(block)
