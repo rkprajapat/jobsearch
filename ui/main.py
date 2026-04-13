@@ -127,17 +127,6 @@ async def application():
                         "text-teal-700 mt-2"
                     )
 
-                with ui.column().classes("glass-card p-5 flex-1 min-w-[260px]"):
-                    ui.label("This Week").classes("text-lg font-bold text-slate-800")
-                    ui.label(
-                        "Build a shortlist from extracted roles and prioritize high-fit opportunities first."
-                    ).classes("text-slate-600 mt-1")
-                    ui.button(
-                        "Open Extraction Studio",
-                        on_click=lambda: ui.navigate.to("/extraction"),
-                        icon="insights",
-                    ).classes("bg-teal-700 text-white mt-2")
-
 
 def start_web_ui():
     ui.run(title="Job Search Dashboard")
