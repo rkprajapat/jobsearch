@@ -1,7 +1,7 @@
 [project]
 name = "jobsearch"
 version = "0.1.0"
-description = "Add your description here"
+description = "This is a job search and application studio created for candidates to discover opportunities, understand their patterns and prepare their own profiles to apply for those opportunities"
 readme = "README.md"
 requires-python = ">=3.14.2"
 dependencies = [
