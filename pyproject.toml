@@ -15,6 +15,7 @@ dependencies = [
     "reportlab==4.4.10",
     "scikit-learn==1.7.2",
     "spacy==3.8.13",
+    "structlog==25.5.0",
 ]
 
 [tool.uv.sources]

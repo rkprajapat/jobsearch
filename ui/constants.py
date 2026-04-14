@@ -1,5 +1,4 @@
 # UI Theme & Constants module
-from typing import Final
 
 # Tailwind class sets for consistent styling
 CLASSES: dict[str, str] = {
@@ -19,7 +18,6 @@ CLASSES: dict[str, str] = {
 # Layout constants
 LAYOUT: dict[str, str] = {
     "header_row": "w-full items-center justify-between flex-wrap gap-3 mb-4",
-    "summary_row": "gap-6 mb-4",
     "card_header": "w-full items-start justify-between gap-3",
     "card_column_left": "gap-1",
     "card_column_right": "items-end gap-1",

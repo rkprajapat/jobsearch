@@ -1,7 +1,7 @@
-from pathlib import Path
+from configs import PROJECT_DATA_DIR
 from services.generator import generate_response
 
-_RESUME_PATH = Path(__file__).parent / "resume.md"
+_RESUME_PATH = PROJECT_DATA_DIR.joinpath("resume.md")
 
 
 def _load_resume() -> str:

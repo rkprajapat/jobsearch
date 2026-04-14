@@ -1,9 +1,11 @@
 """
 LLM response generation service using litellm for multiple provider support.
 """
+
 import os
-from dotenv import load_dotenv
+
 import litellm
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -24,13 +26,13 @@ def generate_response(prompt: str) -> str:
 
     Returns:
         Generated response text, empty string on error.
-        
+
     Raises:
         ValueError: If prompt is empty.
     """
     if not prompt or not prompt.strip():
         raise ValueError("Prompt cannot be empty.")
-    
+
     try:
         response = litellm.completion(
             model=f"openai/{LLM_CONFIG['model']}",
@@ -39,7 +41,7 @@ def generate_response(prompt: str) -> str:
             messages=[{"role": "user", "content": prompt}],
         )
         return response.choices[0].message.content or ""
-    
+
     except Exception as e:
         print(f"LLM generation error: {e}")
         raise

@@ -1,8 +1,8 @@
 from nicegui import ui
 
+from ui.applications import show_opportunities
 from ui.extraction_config import render_config
 from ui.jd_extraction import extraction_page
-from ui.applications import show_opportunities
 
 
 def _inject_theme() -> None:
@@ -101,6 +101,7 @@ async def application():
     _inject_theme()
 
     await show_opportunities()
+
 
 def start_web_ui():
     ui.run(title="Job Search Dashboard")
